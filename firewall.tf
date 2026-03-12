@@ -34,6 +34,13 @@ resource "digitalocean_firewall" "gateway" {
 
   droplet_ids = [digitalocean_droplet.gateway.id]
 
+  # API access from load balancer
+  inbound_rule {
+    protocol                  = "tcp"
+    port_range                = "8080"
+    source_load_balancer_uids = [digitalocean_loadbalancer.gateway_lb.id]
+  }
+
   # API access from workers (registration / heartbeat)
   inbound_rule {
     protocol         = "tcp"

@@ -1,3 +1,4 @@
+#cloud-config
 users:
   - name: gatewayuser
     groups: sudo
@@ -32,7 +33,7 @@ write_files:
 
       echo "Downloading warlock-gateway $LATEST..."
       curl -fsSL -o /tmp/warlock-gateway \
-        "https://github.com/TristanBlackwell/warlock-gateway/releases/download/$LATEST/warlock-gateway-x86_64-unknown-linux-gnu"
+        "https://github.com/TristanBlackwell/warlock-gateway/releases/download/$LATEST/warlock-gateway-linux-x86_64"
 
       # Verify and install
       if [ -f /tmp/warlock-gateway ]; then

@@ -57,10 +57,10 @@ output "worker_endpoints" {
 }
 
 output "worker_ssh_console_endpoints" {
-  description = "Warlock SSH console endpoints for all workers (via bastion)"
+  description = "Warlock SSH console endpoints for all workers (via bastion with agent forwarding)"
   value = [
     for ip in digitalocean_droplet.worker[*].ipv4_address_private :
-    "ssh vm-<uuid>@${ip} -p 2222 -o ProxyJump=bastionuser@${digitalocean_floating_ip.bastion.ip_address}"
+    "ssh -A vm-<uuid>@${ip} -p 2222 -o ProxyJump=bastionuser@${digitalocean_floating_ip.bastion.ip_address}"
   ]
 }
 
@@ -75,8 +75,10 @@ output "connection_instructions" {
     Gateway API:
       ${var.cert_id != "" && var.domain != "" ? "https://${var.domain}" : "http://${digitalocean_loadbalancer.gateway_lb.ip}"}
     
-    Worker SSH (via bastion):
-      ssh -J bastionuser@${digitalocean_floating_ip.bastion.ip_address} workeruser@<worker-private-ip>
+    Worker SSH (via bastion with agent forwarding):
+      ssh -A -J bastionuser@${digitalocean_floating_ip.bastion.ip_address} workeruser@<worker-private-ip>
+    
+    Note: Use 'ssh-add ~/.ssh/your_key' first to enable agent forwarding
     
     Warlock API (direct from API host):
       curl http://<worker-private-ip>:3000/internal/health

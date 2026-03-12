@@ -17,8 +17,8 @@ resource "digitalocean_vpc" "main" {
 resource "digitalocean_droplet" "bastion" {
   name     = "bastion"
   region   = var.region
-  size     = "s-1vcpu-512mb"
-  image    = "ubuntu-22-04-x64"
+  size     = "s-1vcpu-512mb-10gb"
+  image    = "ubuntu-24-04-x64"
   vpc_uuid = digitalocean_vpc.main.id
   ssh_keys = [var.ssh_key_id]
 
@@ -42,7 +42,7 @@ resource "digitalocean_droplet" "gateway" {
   name     = "gateway"
   region   = var.region
   size     = "s-1vcpu-1gb"
-  image    = "ubuntu-22-04-x64"
+  image    = "ubuntu-24-04-x64"
   vpc_uuid = digitalocean_vpc.main.id
   ssh_keys = [var.ssh_key_id]
   tags     = ["gateway"]
@@ -91,8 +91,8 @@ resource "digitalocean_droplet" "worker" {
   count    = var.worker_count
   name     = "worker-${count.index}"
   region   = var.region
-  size     = "s-1vcpu-512mb"
-  image    = "ubuntu-22-04-x64"
+  size     = "s-1vcpu-512mb-10gb"
+  image    = "ubuntu-24-04-x64"
   vpc_uuid = digitalocean_vpc.main.id
   ssh_keys = [var.ssh_key_id]
   tags     = ["worker"]

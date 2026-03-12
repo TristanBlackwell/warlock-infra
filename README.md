@@ -144,6 +144,54 @@ terraform apply
 
 The API droplet will receive updated worker configuration.
 
+## Infrastructure access
+
+After deployment, infrastructure components can be accessed via SSH:
+
+### SSH to Bastion
+
+```bash
+ssh -i ~/.ssh/your_key bastionuser@<BASTION_IP>
+```
+
+Get the bastion IP from terraform output:
+```bash
+terraform output bastion_public_ip
+```
+
+### SSH to Gateway or Worker Droplets
+
+To access gateway or worker droplets (which are only accessible from within the VPC), use SSH agent forwarding through the bastion:
+
+```bash
+# Add your SSH key to the agent
+ssh-add ~/.ssh/your_key
+
+# SSH to gateway
+ssh -A -J bastionuser@<BASTION_IP> gatewayuser@<GATEWAY_PRIVATE_IP>
+
+# SSH to worker
+ssh -A -J bastionuser@<BASTION_IP> workeruser@<WORKER_PRIVATE_IP>
+```
+
+Get the private IPs from terraform output:
+```bash
+terraform output gateway_private_ip
+terraform output worker_private_ips
+```
+
+**Note:** The `-A` flag enables SSH agent forwarding, which allows your local SSH key to be used when connecting through the bastion to internal droplets.
+
+### Access VM Consoles
+
+To connect directly to a Firecracker VM's console:
+
+```bash
+ssh vm-<uuid>@<BASTION_IP>
+```
+
+The bastion will automatically proxy your connection to the correct worker hosting that VM.
+
 ## Related
 
 - [Warlock Control Plane](../warlock) - Firecracker management API
