@@ -1,0 +1,68 @@
+users:
+  - name: bastionuser
+    groups: sudo
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${ssh_key}
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+
+ssh_pwauth: false
+
+packages:
+  - curl
+  - jq
+  - openssh-client
+
+write_files:
+  - path: /usr/local/bin/vm-ssh-proxy
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+
+      # Extract VM ID from SSH username (e.g., "vm-abc123" -> "abc123")
+      VM_ID="$${USER#vm-}"
+
+      # Query gateway for VM location
+      API_URL="${gateway_api_url}"
+      LOCATION=$(curl -sf "$API_URL/vm/$VM_ID/location" || {
+          echo "Error: VM '$VM_ID' not found or unavailable" >&2
+          echo "Please check that the VM exists and is running." >&2
+          exit 1
+      })
+
+      # Parse JSON response
+      WORKER_IP=$(echo "$LOCATION" | jq -r '.worker_ip')
+      PORT=$(echo "$LOCATION" | jq -r '.port // 2222')
+
+      # Validate response
+      if [ -z "$WORKER_IP" ] || [ "$WORKER_IP" = "null" ]; then
+          echo "Error: Could not determine VM location" >&2
+          exit 1
+      fi
+
+      # Proxy SSH connection to worker
+      exec ssh -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              -o LogLevel=ERROR \
+              "vm-$VM_ID@$WORKER_IP" -p "$PORT"
+
+  - path: /etc/ssh/sshd_config.d/99-vm-proxy.conf
+    content: |
+      # Route VM connections through proxy
+      Match User vm-*
+          # Execute proxy script instead of shell
+          ForceCommand /usr/local/bin/vm-ssh-proxy
+          
+          # Allow PTY for interactive sessions
+          PermitTTY yes
+          
+          PasswordAuthentication no
+          PubkeyAuthentication no
+  - path: /etc/ssh/sshd_config.d/01-disable-root.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+
+runcmd:
+  - systemctl restart ssh

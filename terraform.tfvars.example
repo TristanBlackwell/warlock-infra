@@ -1,0 +1,26 @@
+# DigitalOcean API token
+# Get from: https://cloud.digitalocean.com/account/api/tokens
+do_token = "dop_v1_xxxxxxxxxxxxxxxxxxxx"
+
+# Deployment region
+# List regions: doctl compute region list
+region = "nyc3"
+
+# SSH key ID
+# Get ID: doctl compute ssh-key list
+ssh_key_id = "12345678"
+
+# public SSH key content (cloud-init user creation)
+# Example: ssh-ed25519 AAAAC3... user@host
+admin_ssh_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... user@host"
+
+# Number of worker instances (control plane hosts)
+worker_count = 1
+
+# Optional: Domain name for SSL (leave empty if not using custom domain)
+# domain = "api.example.com"
+
+# Optional: DigitalOcean certificate ID for HTTPS
+# Upload cert: doctl compute certificate create --name mycert --leaf-certificate-path cert.pem --private-key-path key.pem
+# Get ID: doctl compute certificate list
+# cert_id = "abc123-def456-ghi789"

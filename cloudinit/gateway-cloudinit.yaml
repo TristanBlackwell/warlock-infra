@@ -1,0 +1,87 @@
+users:
+  - name: gatewayuser
+    groups: sudo
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${ssh_key}
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+
+ssh_pwauth: false
+
+packages:
+  - curl
+  - sqlite3
+  - jq
+
+write_files:
+  - path: /opt/warlock-gateway/install.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+
+      echo "Installing warlock-gateway..."
+
+      # Download latest warlock-gateway from GitHub releases
+      LATEST=$(curl -sf https://api.github.com/repos/TristanBlackwell/warlock-gateway/releases/latest | jq -r '.tag_name')
+
+      if [ -z "$LATEST" ] || [ "$LATEST" = "null" ]; then
+        echo "Error: Could not fetch latest release" >&2
+        exit 1
+      fi
+
+      echo "Downloading warlock-gateway $LATEST..."
+      curl -fsSL -o /tmp/warlock-gateway \
+        "https://github.com/TristanBlackwell/warlock-gateway/releases/download/$LATEST/warlock-gateway-x86_64-unknown-linux-gnu"
+
+      # Verify and install
+      if [ -f /tmp/warlock-gateway ]; then
+        chmod +x /tmp/warlock-gateway
+        mv /tmp/warlock-gateway /usr/local/bin/warlock-gateway
+        echo "warlock-gateway installed successfully!"
+      else
+        echo "Error: Failed to download warlock-gateway" >&2
+        exit 1
+      fi
+
+      # Create data directory
+      mkdir -p /var/lib/warlock-gateway
+      chown gatewayuser:gatewayuser /var/lib/warlock-gateway
+
+      # Initialize database (will be created on first run)
+      echo "Gateway installation complete!"
+
+  - path: /etc/systemd/system/warlock-gateway.service
+    content: |
+      [Unit]
+      Description=Warlock Gateway - VM Registry API
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      Type=simple
+      User=gatewayuser
+      WorkingDirectory=/var/lib/warlock-gateway
+      Environment="RUST_LOG=info"
+      Environment="DATABASE_URL=/var/lib/warlock-gateway/registry.db"
+      Environment="BIND_ADDR=0.0.0.0:8080"
+      Environment="HEARTBEAT_TIMEOUT_SECS=60"
+      Environment="HEALTH_CHECK_INTERVAL_SECS=30"
+      ExecStart=/usr/local/bin/warlock-gateway
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
+
+  - path: /etc/ssh/sshd_config.d/security.conf
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+
+runcmd:
+  - [bash, /opt/warlock-gateway/install.sh]
+  - systemctl daemon-reload
+  - systemctl enable warlock-gateway
+  - systemctl start warlock-gateway
+  - systemctl restart ssh
