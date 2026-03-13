@@ -68,6 +68,23 @@ write_files:
       
       netgroup:       nis
 
+  - path: /etc/ssh/vm-authorized-keys
+    permissions: "0644"
+    content: |
+      ${ssh_key}
+
+  - path: /etc/pam.d/sshd-vm
+    content: |
+      # PAM configuration for VM users (minimal checks)
+      # VM users are dynamically created by NSS, no home directory needed
+      auth       required     pam_permit.so
+      account    required     pam_permit.so
+      session    required     pam_permit.so
+
+  - path: /etc/shells.d/vm-ssh-proxy
+    content: |
+      /usr/local/bin/vm-ssh-proxy
+
   - path: /etc/ssh/sshd_config.d/99-vm-proxy.conf
     content: |
       # Route VM connections through proxy
@@ -78,10 +95,14 @@ write_files:
           # Allow PTY for interactive sessions
           PermitTTY yes
           
-          # Standard authorized keys (NSS handles user existence)
-          AuthorizedKeysFile /home/bastionuser/.ssh/authorized_keys
+          # Shared authorized keys for all VM users (NSS handles user existence)
+          AuthorizedKeysFile /etc/ssh/vm-authorized-keys
           
+          # Disable password auth
           PasswordAuthentication no
+          
+          # Use custom PAM config that doesn't require home directory
+          AuthenticationMethods publickey
   - path: /etc/ssh/sshd_config.d/01-disable-root.conf
     content: |
       PermitRootLogin no
@@ -96,6 +117,9 @@ runcmd:
     echo "Installing Warlock NSS module..."
     curl -fsSL "$NSS_URL" -o /lib/x86_64-linux-gnu/libnss_warlock.so.2
     chmod 644 /lib/x86_64-linux-gnu/libnss_warlock.so.2
+    
+    # Add VM proxy script to valid shells
+    echo "/usr/local/bin/vm-ssh-proxy" >> /etc/shells
     
     # Verify NSS module is working
     echo "Testing NSS module..."
