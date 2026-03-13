@@ -42,8 +42,9 @@ write_files:
           exit 1
       fi
 
-      # Proxy SSH connection to worker
-      exec ssh -o StrictHostKeyChecking=no \
+      # Proxy SSH connection to worker (forward agent for key auth)
+      exec ssh -A \
+              -o StrictHostKeyChecking=no \
               -o UserKnownHostsFile=/dev/null \
               -o LogLevel=ERROR \
               "vm-$VM_ID@$WORKER_IP" -p "$PORT"
@@ -95,6 +96,9 @@ write_files:
           # Allow PTY for interactive sessions
           PermitTTY yes
           
+          # Forward SSH agent so key reaches the worker
+          AllowAgentForwarding yes
+          
           # Shared authorized keys for all VM users (NSS handles user existence)
           AuthorizedKeysFile /etc/ssh/vm-authorized-keys
           
@@ -111,7 +115,7 @@ write_files:
 runcmd:
   # Install Warlock NSS module for dynamic VM user resolution
   - |
-    NSS_VERSION="v0.1.0"
+    NSS_VERSION="v0.2.0"
     NSS_URL="https://github.com/TristanBlackwell/warlock-nss/releases/download/$NSS_VERSION/libnss_warlock.so.2"
     
     echo "Installing Warlock NSS module..."
@@ -120,6 +124,10 @@ runcmd:
     
     # Add VM proxy script to valid shells
     echo "/usr/local/bin/vm-ssh-proxy" >> /etc/shells
+    
+    # Configure PAM to allow VM users (add rule before pam_unix.so)
+    echo "Configuring PAM for VM users..."
+    sed -i '1i account sufficient pam_succeed_if.so user =~ vm-*' /etc/pam.d/common-account
     
     # Verify NSS module is working
     echo "Testing NSS module..."

@@ -19,56 +19,32 @@ packages:
   - socat
   - nftables
   - iproute2
+  - squashfs-tools
+  - e2fsprogs
+  - jq
 
 write_files:
   - path: /etc/sysctl.d/99-firecracker.conf
     content: |
       net.ipv4.ip_forward=1
-  - path: /opt/warlock/install-firecracker.sh
+  - path: /opt/warlock/install-wrapper.sh
     permissions: "0755"
     content: |
       #!/bin/bash
       set -euo pipefail
 
-      echo "Installing Firecracker and Warlock..."
-
-      # Create directory structure
-      mkdir -p /opt/firecracker /srv/jailer/vm-images /srv/jailer/vsock /etc/warlock/ssh
-
-      # Download and install Firecracker
-      FIRECRACKER_VERSION="v1.15.0"
-      curl -fsSL https://github.com/firecracker-microvm/firecracker/releases/download/$${FIRECRACKER_VERSION}/firecracker-$${FIRECRACKER_VERSION}-x86_64.tgz | tar -xz
-      mv release-$${FIRECRACKER_VERSION}-x86_64/firecracker-$${FIRECRACKER_VERSION}-x86_64 /usr/local/bin/firecracker
-      mv release-$${FIRECRACKER_VERSION}-x86_64/jailer-$${FIRECRACKER_VERSION}-x86_64 /usr/local/bin/jailer
-      rm -rf release-$${FIRECRACKER_VERSION}-x86_64
-      chmod +x /usr/local/bin/firecracker /usr/local/bin/jailer
-
-      # Download kernel and rootfs from Firecracker CI
-      echo "Downloading kernel and rootfs (this may take a few minutes)..."
-      curl -fsSL -o /opt/firecracker/vmlinux-6.1.102 \
-        https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.9/x86_64/vmlinux-6.1.102
-
-      curl -fsSL -o /opt/firecracker/ubuntu-22.04.ext4 \
-        https://s3.amazonaws.com/spec.ccfc.min/firecracker-ci/v1.9/x86_64/ubuntu-22.04.ext4
-
-      # Create symlinks
-      ln -sf vmlinux-6.1.102 /opt/firecracker/vmlinux
-      ln -sf ubuntu-22.04.ext4 /opt/firecracker/rootfs.ext4
-
-      # Set ownership
-      chown -R firecracker:firecracker /srv/jailer
-
-      # Enable IP forwarding
-      sysctl -p /etc/sysctl.d/99-firecracker.conf
-
-      # Set up nftables
-      nft add table firecracker || true
-      nft add chain firecracker postrouting { type nat hook postrouting priority 100 \; } || true
-      nft add chain firecracker filter { type filter hook forward priority 0 \; } || true
-
-      echo "Firecracker installation complete!"
-
-      # Download and install Warlock
+      echo "Downloading install-firecracker.sh from warlock repository..."
+      
+      # Download the full install script from GitHub
+      curl -fsSL -o /tmp/install-firecracker.sh \
+        https://raw.githubusercontent.com/TristanBlackwell/warlock/master/scripts/install-firecracker.sh
+      
+      chmod +x /tmp/install-firecracker.sh
+      
+      # Run the install script
+      /tmp/install-firecracker.sh
+      
+      # Download and install Warlock binary
       echo "Installing Warlock from GitHub releases..."
       WARLOCK_LATEST=$(curl -fsSL https://api.github.com/repos/TristanBlackwell/warlock/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
       curl -fsSL -o /tmp/warlock "https://github.com/TristanBlackwell/warlock/releases/download/$${WARLOCK_LATEST}/warlock-linux-x86_64"
@@ -93,6 +69,7 @@ write_files:
       Type=simple
       User=root
       WorkingDirectory=/opt/warlock
+      EnvironmentFile=-/etc/warlock/environment
       Environment="RUST_LOG=info"
       Environment="FIRECRACKER_BIN=/usr/local/bin/firecracker"
       Environment="JAILER_BIN=/usr/local/bin/jailer"
@@ -106,7 +83,14 @@ write_files:
       WantedBy=multi-user.target
 
 runcmd:
-  - [bash, /opt/warlock/install-firecracker.sh]
+  - [bash, /opt/warlock/install-wrapper.sh]
+  - mkdir -p /etc/warlock
+  - |
+    WORKER_IP=$(ip -4 addr show eth1 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    if [ -z "$WORKER_IP" ]; then
+      WORKER_IP=$(ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    fi
+    echo "WORKER_IP=$WORKER_IP" > /etc/warlock/environment
   - systemctl daemon-reload
   - systemctl enable warlock
   - systemctl start warlock

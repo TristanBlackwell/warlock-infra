@@ -91,7 +91,7 @@ resource "digitalocean_droplet" "worker" {
   count    = var.worker_count
   name     = "worker-${count.index}"
   region   = var.region
-  size     = "s-1vcpu-512mb-10gb"
+  size     = "s-1vcpu-2gb"
   image    = "ubuntu-24-04-x64"
   vpc_uuid = digitalocean_vpc.main.id
   ssh_keys = [var.ssh_key_id]
