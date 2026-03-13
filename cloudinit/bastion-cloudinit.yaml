@@ -100,7 +100,7 @@ runcmd:
     # Verify NSS module is working
     echo "Testing NSS module..."
     if getent passwd vm-00000000-0000-4000-8000-000000000000 | grep -q "vm-00000000"; then
-      echo "✓ NSS module installed successfully"
+      echo "[OK] NSS module installed successfully"
     else
       echo "WARNING: NSS module may not be functioning correctly" >&2
     fi
