@@ -47,6 +47,26 @@ write_files:
               -o UserKnownHostsFile=/dev/null \
               -o LogLevel=ERROR \
               "vm-$VM_ID@$WORKER_IP" -p "$PORT"
+  
+  - path: /etc/nsswitch.conf
+    content: |
+      # /etc/nsswitch.conf - Name Service Switch configuration
+      # 
+      # For VM users (vm-*), the 'warlock' NSS module provides dynamic user resolution
+      passwd:         files warlock systemd
+      group:          files systemd
+      shadow:         files
+      gshadow:        files
+      
+      hosts:          files dns
+      networks:       files
+      
+      protocols:      db files
+      services:       db files
+      ethers:         db files
+      rpc:            db files
+      
+      netgroup:       nis
 
   - path: /etc/ssh/sshd_config.d/99-vm-proxy.conf
     content: |
@@ -58,12 +78,31 @@ write_files:
           # Allow PTY for interactive sessions
           PermitTTY yes
           
+          # Standard authorized keys (NSS handles user existence)
+          AuthorizedKeysFile /home/bastionuser/.ssh/authorized_keys
+          
           PasswordAuthentication no
-          PubkeyAuthentication no
   - path: /etc/ssh/sshd_config.d/01-disable-root.conf
     content: |
       PermitRootLogin no
       PasswordAuthentication no
 
 runcmd:
+  # Install Warlock NSS module for dynamic VM user resolution
+  - |
+    NSS_VERSION="v0.1.0"
+    NSS_URL="https://github.com/TristanBlackwell/warlock-nss/releases/download/$NSS_VERSION/libnss_warlock.so.2"
+    
+    echo "Installing Warlock NSS module..."
+    curl -fsSL "$NSS_URL" -o /lib/x86_64-linux-gnu/libnss_warlock.so.2
+    chmod 644 /lib/x86_64-linux-gnu/libnss_warlock.so.2
+    
+    # Verify NSS module is working
+    echo "Testing NSS module..."
+    if getent passwd vm-00000000-0000-4000-8000-000000000000 | grep -q "vm-00000000"; then
+      echo "✓ NSS module installed successfully"
+    else
+      echo "WARNING: NSS module may not be functioning correctly" >&2
+    fi
+  
   - systemctl restart ssh
