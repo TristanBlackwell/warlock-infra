@@ -67,32 +67,42 @@ output "worker_ssh_console_endpoints" {
 output "connection_instructions" {
   description = "Quick reference for connecting to infrastructure"
   value       = <<-EOT
-    === Warlock Infrastructure Connection Guide ===
+    === Warlock Infrastructure - Connection Guide ===
     
-    Bastion SSH:
-      ssh bastionuser@${digitalocean_floating_ip.bastion.ip_address}
+    📖 Full Documentation:
+      - Quick Start:  See QUICKSTART.md
+      - SSH Access:   See VM-SSH-ACCESS.md
+      - Architecture: See README.md
     
-    Gateway API:
+    🔑 IMPORTANT: Before SSH access, load your key:
+      ssh-add ~/.ssh/your_private_key
+    
+    === API Access (via Load Balancer) ===
+    
+    Gateway API URL:
       ${var.cert_id != "" && var.domain != "" ? "https://${var.domain}" : "http://${digitalocean_loadbalancer.gateway_lb.ip}"}
     
-    Worker SSH (via bastion with agent forwarding):
-      ssh -A -J bastionuser@${digitalocean_floating_ip.bastion.ip_address} workeruser@<worker-private-ip>
+    Create VM:
+      curl -X POST ${var.cert_id != "" && var.domain != "" ? "https://${var.domain}" : "http://${digitalocean_loadbalancer.gateway_lb.ip}"}/vm \
+        -H "Content-Type: application/json" \
+        -d '{"vcpus":1,"memory_mb":256,"ssh_keys":["<your-public-key>"]}'
     
-    Note: Use 'ssh-add ~/.ssh/your_key' first to enable agent forwarding
+    Health Check:
+      curl ${var.cert_id != "" && var.domain != "" ? "https://${var.domain}" : "http://${digitalocean_loadbalancer.gateway_lb.ip}"}/internal/health
     
-    Warlock API (direct from API host):
-      curl http://<worker-private-ip>:3000/internal/health
+    === SSH Access (via Bastion) ===
     
-    === Connect to Guest VMs ===
+    Bastion IP:
+      ${digitalocean_floating_ip.bastion.ip_address}
     
-    Direct VM Access:
-      ssh vm-<uuid>@${digitalocean_floating_ip.bastion.ip_address}
+    Connect to VM (auto-login as root):
+      ssh vm-<vm-id>@${digitalocean_floating_ip.bastion.ip_address}
     
-    Example:
-      # Get VM ID from creating a VM
-      VM_ID=$(curl -X POST http://<gateway>/vm -d '{"vcpus":1,"mem_size_mib":128}' | jq -r '.id')
-      
-      # Connect to VM console
-      ssh vm-$VM_ID@${digitalocean_floating_ip.bastion.ip_address}
+    === Network Topology ===
+    
+    Bastion IP:        ${digitalocean_floating_ip.bastion.ip_address}  (for SSH)
+    Load Balancer IP:  ${digitalocean_loadbalancer.gateway_lb.ip}      (for API)
+    Gateway (private): ${digitalocean_droplet.gateway.ipv4_address_private}
+    Workers (private): ${join(", ", digitalocean_droplet.worker[*].ipv4_address_private)}
   EOT
 }

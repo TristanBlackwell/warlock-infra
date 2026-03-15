@@ -111,6 +111,11 @@ write_files:
     content: |
       PermitRootLogin no
       PasswordAuthentication no
+  - path: /etc/ssh/sshd_config.d/02-performance.conf
+    content: |
+      # Increase connection limits for VM proxy workload
+      MaxStartups 100:30:200
+      MaxSessions 100
 
 runcmd:
   # Install Warlock NSS module for dynamic VM user resolution
