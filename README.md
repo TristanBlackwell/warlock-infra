@@ -62,6 +62,17 @@ for scaling, and although not currently implemented, authentication.
 
 See [QUICKSTART.md](QUICKSTART.md) for usage examples.
 
+### Security Model
+
+The infrastructure uses a defense-in-depth approach with firewall rules:
+
+- **Bastion:** SSH (port 22) open to internet - hardened public gateway
+- **Gateway:** SSH (port 22) **restricted to bastion only** - no direct internet access
+- **Workers:** SSH (port 22) **restricted to bastion only** - no direct internet access
+- **Load Balancer:** HTTP/HTTPS traffic routes to gateway API (port 8080)
+
+This limits the attack surface to a single hardened SSH endpoint (bastion) while keeping internal components protected.
+
 ## Prerequisites
 
 1. **DigitalOcean Account** with API access

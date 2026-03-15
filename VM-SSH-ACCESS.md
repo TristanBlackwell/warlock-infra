@@ -115,6 +115,8 @@ When you connect to a VM, your SSH session goes through multiple authentication 
 
 ### Components Involved
 
+**Security Note:** Gateway and worker droplets have firewall rules that **block direct SSH from the internet**. SSH access is **only allowed from the bastion's private IP**. This reduces the attack surface to a single hardened endpoint.
+
 #### 1. NSS Module (Name Service Switch)
 - **Location:** `/lib/x86_64-linux-gnu/libnss_warlock.so.2` on bastion
 - **Purpose:** Dynamically resolves `vm-<uuid>` usernames to UIDs
@@ -608,6 +610,16 @@ doctl compute droplet list --format Name,PublicIPv4
 - **Scaling:** Automatically distributes to multiple gateway instances
 
 ### Security Model
+
+#### Firewall Protection
+
+**Network Security:**
+- **Bastion:** SSH (port 22) open to internet - single hardened entry point
+- **Gateway:** SSH (port 22) **blocked from internet** - only accepts connections from bastion private IP
+- **Workers:** SSH (port 22) **blocked from internet** - only accepts connections from bastion private IP
+- **VMs:** Not directly accessible - vsock console only, no network exposure
+
+This firewall configuration ensures that internal infrastructure components cannot be directly accessed from the internet, reducing the attack surface to a single hardened SSH gateway (bastion).
 
 #### Authentication Layers
 
